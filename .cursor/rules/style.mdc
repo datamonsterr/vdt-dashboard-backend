@@ -1,0 +1,11 @@
+---
+description: 
+globs: *.go
+alwaysApply: false
+---
+Follow standard Go conventions (gofmt).
+Use clear and descriptive variable and function names.
+Add comments to explain complex logic. If the code is self-explained, do not add obvious comment.
+Keep functions small and focused on a single task. Break down function if it is complex.
+Handle errors explicitly; do not ignore them.
+Use dependency injection to decouple components.

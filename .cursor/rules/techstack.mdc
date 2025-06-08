@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+golang version 1.24.
+gin-gonic/gin for routing.
+postgres 17.5 for the database.
+gorm for ORM.
+standard library for most other tasks
+Use air for development. Assume user always running `air .` so do not run this command again?.

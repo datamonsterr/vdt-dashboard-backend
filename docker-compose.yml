@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 17.5 Database
+  postgres:
+    image: postgres:17.5-alpine
+    container_name: vdt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vdt_dashboard
+      POSTGRES_USER: vdt_user
+      POSTGRES_PASSWORD: vdt_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - vdt-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vdt_user -d vdt_dashboard"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Go 1.24 Backend Application
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vdt-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - GIN_MODE=release
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=vdt_user
+      - DB_PASSWORD=vdt_password
+      - DB_NAME=vdt_dashboard
+      - DB_SSLMODE=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vdt-network
+    volumes:
+      - ./logs:/app/logs
+
+  # Development version with hot reload (optional)
+  backend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: vdt-backend-dev
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      - GIN_MODE=debug
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=vdt_user
+      - DB_PASSWORD=vdt_password
+      - DB_NAME=vdt_dashboard
+      - DB_SSLMODE=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vdt-network
+    volumes:
+      - .:/app
+      - /app/tmp
+    profiles:
+      - dev
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  vdt-network:
+    driver: bridge

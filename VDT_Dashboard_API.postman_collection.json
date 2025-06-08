@@ -1,0 +1,362 @@
+{
+  "info": {
+    "name": "VDT Dashboard Backend API",
+    "description": "Database Schema Builder API - Complete collection for testing all endpoints",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "schema_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check API health status and database connectivity"
+          },
+          "response": [
+            {
+              "name": "Health Check Success",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/health",
+                  "host": ["{{base_url}}"],
+                  "path": ["health"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Service is healthy\",\n  \"data\": {\n    \"status\": \"healthy\",\n    \"timestamp\": \"2024-01-01T13:00:00Z\",\n    \"database\": \"connected\",\n    \"version\": \"1.0.0\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Schema Management",
+      "item": [
+        {
+          "name": "Create Schema",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.id) {",
+                  "        pm.collectionVariables.set('schema_id', response.data.id);",
+                  "        console.log('Schema ID set to:', response.data.id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"my_blog_schema\",\n  \"description\": \"Blog database schema for testing\",\n  \"tables\": [\n    {\n      \"id\": \"users_table\",\n      \"name\": \"users\",\n      \"columns\": [\n        {\n          \"id\": \"user_id\",\n          \"name\": \"id\",\n          \"dataType\": \"INT\",\n          \"nullable\": false,\n          \"primaryKey\": true,\n          \"autoIncrement\": true\n        },\n        {\n          \"id\": \"user_email\",\n          \"name\": \"email\",\n          \"dataType\": \"VARCHAR\",\n          \"length\": 255,\n          \"nullable\": false,\n          \"unique\": true\n        },\n        {\n          \"id\": \"user_name\",\n          \"name\": \"name\",\n          \"dataType\": \"VARCHAR\",\n          \"length\": 100,\n          \"nullable\": false\n        },\n        {\n          \"id\": \"user_created_at\",\n          \"name\": \"created_at\",\n          \"dataType\": \"TIMESTAMP\",\n          \"nullable\": false\n        }\n      ],\n      \"position\": {\"x\": 100, \"y\": 100}\n    },\n    {\n      \"id\": \"posts_table\",\n      \"name\": \"posts\",\n      \"columns\": [\n        {\n          \"id\": \"post_id\",\n          \"name\": \"id\",\n          \"dataType\": \"INT\",\n          \"nullable\": false,\n          \"primaryKey\": true,\n          \"autoIncrement\": true\n        },\n        {\n          \"id\": \"post_user_id\",\n          \"name\": \"user_id\",\n          \"dataType\": \"INT\",\n          \"nullable\": false\n        },\n        {\n          \"id\": \"post_title\",\n          \"name\": \"title\",\n          \"dataType\": \"VARCHAR\",\n          \"length\": 255,\n          \"nullable\": false\n        },\n        {\n          \"id\": \"post_content\",\n          \"name\": \"content\",\n          \"dataType\": \"TEXT\",\n          \"nullable\": true\n        },\n        {\n          \"id\": \"post_published\",\n          \"name\": \"published\",\n          \"dataType\": \"BOOLEAN\",\n          \"nullable\": false\n        }\n      ],\n      \"position\": {\"x\": 400, \"y\": 100}\n    }\n  ],\n  \"foreignKeys\": [\n    {\n      \"id\": \"fk_posts_user\",\n      \"fromTableId\": \"posts_table\",\n      \"fromColumnId\": \"post_user_id\",\n      \"toTableId\": \"users_table\",\n      \"toColumnId\": \"user_id\",\n      \"onDelete\": \"CASCADE\",\n      \"onUpdate\": \"CASCADE\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/schemas",
+              "host": ["{{base_url}}"],
+              "path": ["schemas"]
+            },
+            "description": "Create a new database schema with tables and relationships"
+          }
+        },
+        {
+          "name": "List All Schemas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/schemas?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["schemas"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Retrieve all schemas with pagination and optional search"
+          }
+        },
+        {
+          "name": "Get Schema by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/schemas/{{schema_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["schemas", "{{schema_id}}"]
+            },
+            "description": "Get complete schema definition by ID"
+          }
+        },
+        {
+          "name": "Update Schema",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"my_blog_schema_updated\",\n  \"description\": \"Updated blog database schema for testing\",\n  \"tables\": [\n    {\n      \"id\": \"users_table\",\n      \"name\": \"users\",\n      \"columns\": [\n        {\n          \"id\": \"user_id\",\n          \"name\": \"id\",\n          \"dataType\": \"INT\",\n          \"nullable\": false,\n          \"primaryKey\": true,\n          \"autoIncrement\": true\n        },\n        {\n          \"id\": \"user_email\",\n          \"name\": \"email\",\n          \"dataType\": \"VARCHAR\",\n          \"length\": 255,\n          \"nullable\": false,\n          \"unique\": true\n        },\n        {\n          \"id\": \"user_name\",\n          \"name\": \"name\",\n          \"dataType\": \"VARCHAR\",\n          \"length\": 100,\n          \"nullable\": false\n        },\n        {\n          \"id\": \"user_bio\",\n          \"name\": \"bio\",\n          \"dataType\": \"TEXT\",\n          \"nullable\": true\n        },\n        {\n          \"id\": \"user_created_at\",\n          \"name\": \"created_at\",\n          \"dataType\": \"TIMESTAMP\",\n          \"nullable\": false\n        }\n      ],\n      \"position\": {\"x\": 100, \"y\": 100}\n    },\n    {\n      \"id\": \"posts_table\",\n      \"name\": \"posts\",\n      \"columns\": [\n        {\n          \"id\": \"post_id\",\n          \"name\": \"id\",\n          \"dataType\": \"INT\",\n          \"nullable\": false,\n          \"primaryKey\": true,\n          \"autoIncrement\": true\n        },\n        {\n          \"id\": \"post_user_id\",\n          \"name\": \"user_id\",\n          \"dataType\": \"INT\",\n          \"nullable\": false\n        },\n        {\n          \"id\": \"post_title\",\n          \"name\": \"title\",\n          \"dataType\": \"VARCHAR\",\n          \"length\": 255,\n          \"nullable\": false\n        },\n        {\n          \"id\": \"post_content\",\n          \"name\": \"content\",\n          \"dataType\": \"TEXT\",\n          \"nullable\": true\n        },\n        {\n          \"id\": \"post_published\",\n          \"name\": \"published\",\n          \"dataType\": \"BOOLEAN\",\n          \"nullable\": false\n        },\n        {\n          \"id\": \"post_views\",\n          \"name\": \"view_count\",\n          \"dataType\": \"INT\",\n          \"nullable\": false\n        }\n      ],\n      \"position\": {\"x\": 400, \"y\": 100}\n    }\n  ],\n  \"foreignKeys\": [\n    {\n      \"id\": \"fk_posts_user\",\n      \"fromTableId\": \"posts_table\",\n      \"fromColumnId\": \"post_user_id\",\n      \"toTableId\": \"users_table\",\n      \"toColumnId\": \"user_id\",\n      \"onDelete\": \"CASCADE\",\n      \"onUpdate\": \"CASCADE\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/schemas/{{schema_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["schemas", "{{schema_id}}"]
+            },
+            "description": "Update an existing schema definition"
+          }
+        },
+        {
+          "name": "Delete Schema",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/schemas/{{schema_id}}?dropDatabase=true",
+              "host": ["{{base_url}}"],
+              "path": ["schemas", "{{schema_id}}"],
+              "query": [
+                {
+                  "key": "dropDatabase",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Delete a schema and optionally drop the associated database"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Database Management",
+      "item": [
+        {
+          "name": "Get Database Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/schemas/{{schema_id}}/database/status",
+              "host": ["{{base_url}}"],
+              "path": ["schemas", "{{schema_id}}", "database", "status"]
+            },
+            "description": "Check the status of the generated database"
+          }
+        },
+        {
+          "name": "Regenerate Database",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/schemas/{{schema_id}}/database/regenerate",
+              "host": ["{{base_url}}"],
+              "path": ["schemas", "{{schema_id}}", "database", "regenerate"]
+            },
+            "description": "Force regeneration of the database from schema definition"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Validation & Export",
+      "item": [
+        {
+          "name": "Validate Schema",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"validation_test_schema\",\n  \"description\": \"Schema for validation testing\",\n  \"tables\": [\n    {\n      \"id\": \"test_table\",\n      \"name\": \"test_table\",\n      \"columns\": [\n        {\n          \"id\": \"col1\",\n          \"name\": \"id\",\n          \"dataType\": \"INT\",\n          \"nullable\": false,\n          \"primaryKey\": true,\n          \"autoIncrement\": true\n        },\n        {\n          \"id\": \"col2\",\n          \"name\": \"name\",\n          \"dataType\": \"VARCHAR\",\n          \"length\": 100,\n          \"nullable\": false\n        }\n      ],\n      \"position\": {\"x\": 100, \"y\": 100}\n    }\n  ],\n  \"foreignKeys\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/schemas/validate",
+              "host": ["{{base_url}}"],
+              "path": ["schemas", "validate"]
+            },
+            "description": "Validate a schema definition without creating it"
+          }
+        },
+        {
+          "name": "Export Schema as SQL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/schemas/{{schema_id}}/export/sql",
+              "host": ["{{base_url}}"],
+              "path": ["schemas", "{{schema_id}}", "export", "sql"]
+            },
+            "description": "Export the schema definition as SQL DDL statements"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test Scenarios",
+      "item": [
+        {
+          "name": "Invalid Schema Validation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"invalid_schema\",\n  \"description\": \"Schema with validation errors\",\n  \"tables\": [\n    {\n      \"id\": \"bad_table\",\n      \"name\": \"bad_table\",\n      \"columns\": [\n        {\n          \"id\": \"col1\",\n          \"name\": \"name\",\n          \"dataType\": \"VARCHAR\",\n          \"length\": 100,\n          \"nullable\": false\n        }\n      ],\n      \"position\": {\"x\": 100, \"y\": 100}\n    }\n  ],\n  \"foreignKeys\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/schemas/validate",
+              "host": ["{{base_url}}"],
+              "path": ["schemas", "validate"]
+            },
+            "description": "Test validation with a schema that has no primary key"
+          }
+        },
+        {
+          "name": "Get Non-existent Schema",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/schemas/00000000-0000-0000-0000-000000000000",
+              "host": ["{{base_url}}"],
+              "path": ["schemas", "00000000-0000-0000-0000-000000000000"]
+            },
+            "description": "Test 404 error for non-existent schema"
+          }
+        },
+        {
+          "name": "Create Duplicate Schema Name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"my_blog_schema\",\n  \"description\": \"Duplicate name test\",\n  \"tables\": [\n    {\n      \"id\": \"simple_table\",\n      \"name\": \"simple_table\",\n      \"columns\": [\n        {\n          \"id\": \"id_col\",\n          \"name\": \"id\",\n          \"dataType\": \"INT\",\n          \"nullable\": false,\n          \"primaryKey\": true,\n          \"autoIncrement\": true\n        }\n      ],\n      \"position\": {\"x\": 100, \"y\": 100}\n    }\n  ],\n  \"foreignKeys\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/schemas",
+              "host": ["{{base_url}}"],
+              "path": ["schemas"]
+            },
+            "description": "Test duplicate name error (409 Conflict)"
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set default values if not already set",
+          "if (!pm.collectionVariables.get('base_url')) {",
+          "    pm.collectionVariables.set('base_url', 'http://localhost:8080/api/v1');",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test to log response status and time",
+          "console.log('Response Status:', pm.response.code);",
+          "console.log('Response Time:', pm.response.responseTime + 'ms');",
+          "",
+          "// Parse JSON response if available",
+          "if (pm.response.headers.get('Content-Type') && pm.response.headers.get('Content-Type').includes('application/json')) {",
+          "    try {",
+          "        const jsonData = pm.response.json();",
+          "        console.log('Response Success:', jsonData.success);",
+          "        if (jsonData.message) {",
+          "            console.log('Message:', jsonData.message);",
+          "        }",
+          "    } catch (e) {",
+          "        console.log('Could not parse JSON response');",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ]
+} 
