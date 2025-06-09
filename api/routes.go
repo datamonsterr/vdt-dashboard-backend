@@ -2,6 +2,7 @@ package api
 
 import (
 	"vdt-dashboard-backend/api/handlers"
+	"vdt-dashboard-backend/api/middleware"
 	"vdt-dashboard-backend/config"
 	"vdt-dashboard-backend/repositories"
 	"vdt-dashboard-backend/services"
@@ -14,6 +15,7 @@ import (
 func SetupRoutes(router *gin.RouterGroup, db *gorm.DB, cfg *config.Config) {
 	// Initialize repositories
 	schemaRepo := repositories.NewSchemaRepository(db)
+	userRepo := repositories.NewUserRepository(db)
 
 	// Initialize services
 	schemaService := services.NewSchemaService(schemaRepo, cfg)
@@ -26,12 +28,21 @@ func SetupRoutes(router *gin.RouterGroup, db *gorm.DB, cfg *config.Config) {
 	healthHandler := handlers.NewHealthHandler(db)
 	validatorHandler := handlers.NewValidatorHandler(validatorService, sqlGeneratorService)
 	databaseHandler := handlers.NewDatabaseHandler(databaseManagerService, schemaService)
+	userHandler := handlers.NewUserHandler()
 
 	// Health check
 	router.GET("/health", healthHandler.HealthCheck)
 
-	// Schema management routes
+	// User routes (protected)
+	userRoutes := router.Group("/user")
+	userRoutes.Use(middleware.AuthMiddleware(userRepo, cfg.ClerkSecretKey)) // Apply authentication middleware
+	{
+		userRoutes.GET("/me", userHandler.GetCurrentUser)
+	}
+
+	// Schema management routes (protected)
 	schemaRoutes := router.Group("/schemas")
+	schemaRoutes.Use(middleware.AuthMiddleware(userRepo, cfg.ClerkSecretKey)) // Apply authentication middleware
 	{
 		schemaRoutes.POST("", schemaHandler.CreateSchema)
 		schemaRoutes.GET("", schemaHandler.ListSchemas)

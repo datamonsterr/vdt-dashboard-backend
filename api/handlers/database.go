@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"vdt-dashboard-backend/api/middleware"
 	"vdt-dashboard-backend/models"
 	"vdt-dashboard-backend/services"
 
@@ -32,8 +33,13 @@ func (h *DatabaseHandler) GetDatabaseStatus(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("Invalid schema ID", models.ErrValidation, "ID must be a valid UUID"))
 		return
 	}
+	user, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse("User not authenticated", models.ErrUnauthorized, "Missing user context"))
+		return
+	}
 
-	schema, err := h.schemaService.GetSchema(id)
+	schema, err := h.schemaService.GetSchema(id, user.ID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse("Schema not found", models.ErrSchemaNotFound, err.Error()))
 		return
@@ -59,7 +65,13 @@ func (h *DatabaseHandler) RegenerateDatabase(c *gin.Context) {
 		return
 	}
 
-	schema, err := h.schemaService.GetSchema(id)
+	user, exists := middleware.GetUserFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse("User not authenticated", models.ErrUnauthorized, "Missing user context"))
+		return
+	}
+
+	schema, err := h.schemaService.GetSchema(id, user.ID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse("Schema not found", models.ErrSchemaNotFound, err.Error()))
 		return

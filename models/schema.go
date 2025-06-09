@@ -13,15 +13,19 @@ import (
 // Schema represents a database schema definition
 type Schema struct {
 	ID               uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	Name             string         `json:"name" gorm:"uniqueIndex;not null"`
+	Name             string         `json:"name" gorm:"not null"`
 	Description      string         `json:"description"`
-	DatabaseName     string         `json:"databaseName" gorm:"uniqueIndex;not null"`
+	DatabaseName     string         `json:"databaseName" gorm:"not null"`
 	Status           string         `json:"status" gorm:"not null;default:'created'"`
 	Version          string         `json:"version" gorm:"not null;default:'1.0'"`
 	SchemaDefinition SchemaData     `json:"schemaDefinition" gorm:"type:jsonb"`
+	UserID           uuid.UUID      `json:"userId" gorm:"type:uuid;not null;index"` // Foreign key to User
 	CreatedAt        time.Time      `json:"createdAt"`
 	UpdatedAt        time.Time      `json:"updatedAt"`
 	DeletedAt        gorm.DeletedAt `json:"-" gorm:"index"`
+
+	// Add unique constraint for name per user
+	// This will be handled in migration: UNIQUE(name, user_id)
 }
 
 // SchemaData represents the complete schema definition structure

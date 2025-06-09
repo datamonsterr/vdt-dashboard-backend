@@ -74,4 +74,6 @@ const (
 	ErrForeignKeyError        = "FOREIGN_KEY_ERROR"
 	ErrDatabaseCreationFailed = "DATABASE_CREATION_FAILED"
 	ErrInternalError          = "INTERNAL_ERROR"
+	ErrUnauthorized           = "UNAUTHORIZED"
+	ErrForbidden              = "FORBIDDEN"
 )

@@ -5,69 +5,26 @@
 http://localhost:8080/api/v1
 ```
 
-## Setup & Configuration
+## Authentication
+This API uses **Clerk** for authentication. All protected endpoints require a valid JWT token in the Authorization header.
 
-### Environment Variables
-
-Create a `.env` file in the project root with the following configuration:
-
-```env
-# Server Configuration
-PORT=8080
-ENVIRONMENT=development
-
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=your_password
-DB_NAME=vdt_dashboard
-
-# Frontend Configuration
-FRONTEND_URL=http://localhost:3000
+### Authentication Header
+```
+Authorization: Bearer <clerk-session-token>
 ```
 
-### Database Setup
+### Getting the Token
+- **Frontend**: Use Clerk's client-side SDK (React, Vue, etc.) via `useAuth().getToken()`
+- **Testing**: Use Clerk's Dashboard or development tools to generate test tokens
+- **Development**: See `docs/authentication-example.md` for complete integration examples
 
-1. **Install PostgreSQL**: Make sure PostgreSQL is installed and running on your system.
+### Token Validation
+- Tokens are verified against Clerk's servers on each request
+- Invalid or expired tokens return `401 Unauthorized`
+- User information is automatically synced from Clerk on each authenticated request
 
-2. **Create Database**: 
-   ```bash
-   make db-create
-   ```
-
-3. **Run Migrations**:
-   ```bash
-   make migrate
-   ```
-
-4. **Seed Sample Data** (optional):
-   ```bash
-   make migrate-seed
-   ```
-
-5. **Complete Setup** (all steps at once):
-   ```bash
-   make db-setup
-   ```
-
-### Database Schema
-
-The application uses a main PostgreSQL database to store schema metadata and creates separate databases for each user-defined schema.
-
-**Main Database Tables:**
-
-- **schemas**: Stores schema definitions and metadata
-  - `id` (UUID): Unique identifier
-  - `name` (VARCHAR): Human-readable schema name
-  - `description` (TEXT): Optional description
-  - `database_name` (VARCHAR): Generated database name
-  - `status` (VARCHAR): Schema status (created, updated, error)
-  - `version` (VARCHAR): Schema version
-  - `schema_definition` (JSONB): Complete schema structure
-  - `created_at`, `updated_at`, `deleted_at`: Timestamps
-
-**Indexes**: Optimized for fast lookups by name, status, and creation date.
+### Protected Endpoints
+All schema management endpoints require authentication. Users can only access their own schemas.
 
 ## Response Format
 All API responses follow this structure:
@@ -87,9 +44,40 @@ All API responses follow this structure:
 - `200` - Success
 - `201` - Created
 - `400` - Bad Request (validation errors)
+- `401` - Unauthorized (missing or invalid token)
+- `403` - Forbidden (insufficient permissions)
 - `404` - Not Found
 - `409` - Conflict (duplicate names, etc.)
 - `500` - Internal Server Error
+
+---
+
+## User Endpoints
+
+### Get Current User
+Get information about the currently authenticated user.
+
+**Endpoint:** `GET /user/me`  
+**Authentication:** Required
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "User retrieved successfully",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "clerkUserId": "user_2abc123def456",
+    "email": "user@example.com",
+    "firstName": "John",
+    "lastName": "Doe",
+    "profileImageUrl": "https://images.clerk.dev/...",
+    "fullName": "John Doe",
+    "createdAt": "2024-01-01T10:00:00Z",
+    "updatedAt": "2024-01-01T10:00:00Z"
+  }
+}
+```
 
 ---
 
@@ -98,7 +86,8 @@ All API responses follow this structure:
 ### 1. Create Schema
 Create a new database schema and generate the actual database.
 
-**Endpoint:** `POST /schemas`
+**Endpoint:** `POST /schemas`  
+**Authentication:** Required
 
 **Request Body:**
 ```json
@@ -155,9 +144,10 @@ Create a new database schema and generate the actual database.
 ---
 
 ### 2. Get All Schemas
-Retrieve all schemas with basic metadata.
+Retrieve all schemas for the authenticated user with basic metadata.
 
-**Endpoint:** `GET /schemas`
+**Endpoint:** `GET /schemas`  
+**Authentication:** Required
 
 **Query Parameters:**
 - `page` (optional): Page number (default: 1)
@@ -205,9 +195,10 @@ Retrieve all schemas with basic metadata.
 ---
 
 ### 3. Get Schema by ID
-Retrieve complete schema definition including all tables, columns, and relationships.
+Retrieve complete schema definition including all tables, columns, and relationships. Only returns schemas owned by the authenticated user.
 
-**Endpoint:** `GET /schemas/{id}`
+**Endpoint:** `GET /schemas/{id}`  
+**Authentication:** Required
 
 **Response (200):**
 ```json
@@ -248,9 +239,10 @@ Retrieve complete schema definition including all tables, columns, and relations
 ---
 
 ### 4. Update Schema
-Update an existing schema. This will modify the schema definition and regenerate the database.
+Update an existing schema owned by the authenticated user. This will modify the schema definition and regenerate the database.
 
-**Endpoint:** `PUT /schemas/{id}`
+**Endpoint:** `PUT /schemas/{id}`  
+**Authentication:** Required
 
 **Request Body:** Same format as Create Schema
 
@@ -275,9 +267,10 @@ Update an existing schema. This will modify the schema definition and regenerate
 ---
 
 ### 5. Delete Schema
-Delete a schema and optionally drop the associated database.
+Delete a schema owned by the authenticated user and optionally drop the associated database.
 
-**Endpoint:** `DELETE /schemas/{id}`
+**Endpoint:** `DELETE /schemas/{id}`  
+**Authentication:** Required
 
 **Query Parameters:**
 - `dropDatabase` (optional): Boolean, whether to drop the actual database (default: true)
@@ -299,9 +292,10 @@ Delete a schema and optionally drop the associated database.
 ## Database Management Endpoints
 
 ### 6. Get Database Status
-Check the status of the generated database.
+Check the status of the generated database for a schema owned by the authenticated user.
 
-**Endpoint:** `GET /schemas/{id}/database/status`
+**Endpoint:** `GET /schemas/{id}/database/status`  
+**Authentication:** Required
 
 **Response (200):**
 ```json
@@ -322,9 +316,10 @@ Check the status of the generated database.
 ---
 
 ### 7. Regenerate Database
-Force regeneration of the database from the schema definition.
+Force regeneration of the database from the schema definition for a schema owned by the authenticated user.
 
-**Endpoint:** `POST /schemas/{id}/database/regenerate`
+**Endpoint:** `POST /schemas/{id}/database/regenerate`  
+**Authentication:** Required
 
 **Response (200):**
 ```json
@@ -394,9 +389,10 @@ Validate a schema definition without creating it.
 ---
 
 ### 9. Export Schema as SQL
-Export the schema definition as SQL DDL statements.
+Export the schema definition as SQL DDL statements for a schema owned by the authenticated user.
 
-**Endpoint:** `GET /schemas/{id}/export/sql`
+**Endpoint:** `GET /schemas/{id}/export/sql`  
+**Authentication:** Required
 
 **Response (200):**
 ```json
@@ -478,10 +474,11 @@ Check API health status.
 - **Schema Retrieval**: 100 requests per minute
 - **Validation**: 50 requests per minute
 
-## Authentication
-Authentication is handled upstream (proxy/gateway). The API expects user information to be available in request headers:
-- `X-User-ID`: User identifier
-- `X-User-Email`: User email (optional)
+## Security Notes
+- All authentication is handled directly by the API using Clerk JWT verification
+- No upstream proxy or gateway authentication is required
+- User identity is extracted from the verified JWT token
+- Each request requiring authentication must include a valid Clerk session token
 
 ## CORS
 The API supports CORS for browser-based applications. Preflight requests are handled automatically.

@@ -13,3 +13,4 @@ When initialize the project, plans tasks in docs/todos.md, after complete tasks,
 Plan Description Requirements will be listed in docs/PRD.md.
 After changing something that break the api update it to the docs/api.md. Other developer will see this file to use the program. Update docs/postman_collection too after changing api.
 Complex architecture will be summarized in docs/engineer.md and draw diagram using mermaid for stuff such as ERD, System architecture, etc. Make it easier for me to catch up with the project and to understand the code better.
+If use some external library, check for documentation by using context7 tools.

@@ -14,12 +14,12 @@ import (
 
 // SchemaService defines the interface for schema business logic
 type SchemaService interface {
-	CreateSchema(request models.CreateSchemaRequest) (*models.Schema, error)
-	GetSchema(id uuid.UUID) (*models.Schema, error)
-	UpdateSchema(id uuid.UUID, request models.UpdateSchemaRequest) (*models.Schema, error)
-	DeleteSchema(id uuid.UUID) error
-	ListSchemas(pagination models.PaginationRequest) ([]models.SchemaListResponse, *models.PaginationResponse, error)
-	ExportSQL(id uuid.UUID) (*models.SQLExportResponse, error)
+	CreateSchema(request models.CreateSchemaRequest, userID uuid.UUID) (*models.Schema, error)
+	GetSchema(id, userID uuid.UUID) (*models.Schema, error)
+	UpdateSchema(id, userID uuid.UUID, request models.UpdateSchemaRequest) (*models.Schema, error)
+	DeleteSchema(id, userID uuid.UUID) error
+	ListSchemas(pagination models.PaginationRequest, userID uuid.UUID) ([]models.SchemaListResponse, *models.PaginationResponse, error)
+	ExportSQL(id, userID uuid.UUID) (*models.SQLExportResponse, error)
 }
 
 // ValidatorService defines the interface for schema validation
@@ -82,7 +82,12 @@ type databaseManagerService struct {
 }
 
 // SchemaService implementation
-func (s *schemaService) CreateSchema(request models.CreateSchemaRequest) (*models.Schema, error) {
+func (s *schemaService) CreateSchema(request models.CreateSchemaRequest, userID uuid.UUID) (*models.Schema, error) {
+	// Check if schema name already exists for this user
+	if _, err := s.repo.GetByNameAndUserID(request.Name, userID); err == nil {
+		return nil, fmt.Errorf("schema with name '%s' already exists", request.Name)
+	}
+
 	// Generate unique database name
 	databaseName := fmt.Sprintf("schema_%s", strings.ReplaceAll(uuid.New().String(), "-", "_"))
 
@@ -93,6 +98,7 @@ func (s *schemaService) CreateSchema(request models.CreateSchemaRequest) (*model
 		DatabaseName: databaseName,
 		Status:       "created",
 		Version:      "1.0",
+		UserID:       userID,
 		SchemaDefinition: models.SchemaData{
 			Tables:      request.Tables,
 			ForeignKeys: request.ForeignKeys,
@@ -108,14 +114,21 @@ func (s *schemaService) CreateSchema(request models.CreateSchemaRequest) (*model
 	return schema, nil
 }
 
-func (s *schemaService) GetSchema(id uuid.UUID) (*models.Schema, error) {
-	return s.repo.GetByID(id)
+func (s *schemaService) GetSchema(id, userID uuid.UUID) (*models.Schema, error) {
+	return s.repo.GetByIDAndUserID(id, userID)
 }
 
-func (s *schemaService) UpdateSchema(id uuid.UUID, request models.UpdateSchemaRequest) (*models.Schema, error) {
-	schema, err := s.repo.GetByID(id)
+func (s *schemaService) UpdateSchema(id, userID uuid.UUID, request models.UpdateSchemaRequest) (*models.Schema, error) {
+	schema, err := s.repo.GetByIDAndUserID(id, userID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Check if new name conflicts with existing schema for this user (excluding current schema)
+	if schema.Name != request.Name {
+		if existing, err := s.repo.GetByNameAndUserID(request.Name, userID); err == nil && existing.ID != id {
+			return nil, fmt.Errorf("schema with name '%s' already exists", request.Name)
+		}
 	}
 
 	schema.Name = request.Name
@@ -134,12 +147,12 @@ func (s *schemaService) UpdateSchema(id uuid.UUID, request models.UpdateSchemaRe
 	return schema, nil
 }
 
-func (s *schemaService) DeleteSchema(id uuid.UUID) error {
-	return s.repo.Delete(id)
+func (s *schemaService) DeleteSchema(id, userID uuid.UUID) error {
+	return s.repo.DeleteByIDAndUserID(id, userID)
 }
 
-func (s *schemaService) ListSchemas(pagination models.PaginationRequest) ([]models.SchemaListResponse, *models.PaginationResponse, error) {
-	schemas, total, err := s.repo.List(pagination)
+func (s *schemaService) ListSchemas(pagination models.PaginationRequest, userID uuid.UUID) ([]models.SchemaListResponse, *models.PaginationResponse, error) {
+	schemas, total, err := s.repo.ListByUserID(pagination, userID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -155,8 +168,8 @@ func (s *schemaService) ListSchemas(pagination models.PaginationRequest) ([]mode
 	return schemas, paginationResp, nil
 }
 
-func (s *schemaService) ExportSQL(id uuid.UUID) (*models.SQLExportResponse, error) {
-	schema, err := s.repo.GetByID(id)
+func (s *schemaService) ExportSQL(id, userID uuid.UUID) (*models.SQLExportResponse, error) {
+	schema, err := s.repo.GetByIDAndUserID(id, userID)
 	if err != nil {
 		return nil, err
 	}

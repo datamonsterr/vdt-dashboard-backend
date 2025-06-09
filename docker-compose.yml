@@ -41,6 +41,7 @@ services:
       - DB_PASSWORD=vdt_password
       - DB_NAME=vdt_dashboard
       - DB_SSLMODE=disable
+      - CLERK_SECRET_KEY=sk_test_ytMrh1TsqxMtjUlaXGnQNxJ30ai8IEivbEW4nFWQn4 
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,6 +67,7 @@ services:
       - DB_PASSWORD=vdt_password
       - DB_NAME=vdt_dashboard
       - DB_SSLMODE=disable
+      - CLERK_SECRET_KEY=sk_test_ytMrh1TsqxMtjUlaXGnQNxJ30ai8IEivbEW4nFWQn4 
     depends_on:
       postgres:
         condition: service_healthy

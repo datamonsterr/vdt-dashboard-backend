@@ -60,7 +60,29 @@ ENVIRONMENT=development
 
 # Frontend Configuration
 FRONTEND_URL=http://localhost:3000
+
+# Clerk Authentication (Required)
+CLERK_SECRET_KEY=sk_test_your_clerk_secret_key_here
 ```
+
+### Authentication Setup
+
+This application uses **Clerk** for authentication. You need to:
+
+1. **Create a Clerk account** at [clerk.com](https://clerk.com)
+2. **Create a new application** in your Clerk dashboard
+3. **Get your Secret Key** from the API Keys section
+4. **Add the secret key** to your `.env` file as `CLERK_SECRET_KEY`
+
+**Frontend Integration:**
+- Install Clerk's React SDK in your frontend
+- Wrap your app with `<ClerkProvider>`
+- Use `useAuth()` to get session tokens
+- Send tokens in `Authorization: Bearer <token>` header
+
+**Testing:**
+- Use Clerk's development tools to generate test tokens
+- Or create test users through Clerk's dashboard
 
 ### Database Setup
 

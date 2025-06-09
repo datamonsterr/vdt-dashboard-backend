@@ -117,8 +117,8 @@ func createModels(db *gorm.DB) error {
 
 	// AutoMigrate will create tables, missing columns, missing indexes
 	// It will NOT delete unused columns to protect data
-	if err := db.AutoMigrate(&models.Schema{}); err != nil {
-		return fmt.Errorf("failed to migrate Schema model: %w", err)
+	if err := db.AutoMigrate(&models.User{}, &models.Schema{}); err != nil {
+		return fmt.Errorf("failed to migrate models: %w", err)
 	}
 
 	log.Println("✅ Models created/updated successfully")
@@ -185,9 +185,12 @@ func seedData(db *gorm.DB) error {
 func resetDatabase(db *gorm.DB) error {
 	log.Println("⚠️  Resetting database (this will delete all data)...")
 
-	// Drop tables
+	// Drop tables (in reverse order due to foreign keys)
 	if err := db.Migrator().DropTable(&models.Schema{}); err != nil {
 		log.Printf("Warning: failed to drop schemas table: %v", err)
+	}
+	if err := db.Migrator().DropTable(&models.User{}); err != nil {
+		log.Printf("Warning: failed to drop users table: %v", err)
 	}
 
 	// Recreate tables

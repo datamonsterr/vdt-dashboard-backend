@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"vdt-dashboard-backend/api/middleware"
 	"vdt-dashboard-backend/models"
 	"vdt-dashboard-backend/services"
 
@@ -24,13 +25,20 @@ func NewSchemaHandler(schemaService services.SchemaService) *SchemaHandler {
 
 // CreateSchema handles POST /schemas
 func (h *SchemaHandler) CreateSchema(c *gin.Context) {
+	// Get authenticated user ID
+	userID, exists := middleware.GetUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse("User not authenticated", models.ErrUnauthorized, "Missing user context"))
+		return
+	}
+
 	var request models.CreateSchemaRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("Invalid request data", models.ErrValidation, err.Error()))
 		return
 	}
 
-	schema, err := h.schemaService.CreateSchema(request)
+	schema, err := h.schemaService.CreateSchema(request, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to create schema", models.ErrInternalError, err.Error()))
 		return
@@ -41,13 +49,20 @@ func (h *SchemaHandler) CreateSchema(c *gin.Context) {
 
 // ListSchemas handles GET /schemas
 func (h *SchemaHandler) ListSchemas(c *gin.Context) {
+	// Get authenticated user ID
+	userID, exists := middleware.GetUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse("User not authenticated", models.ErrUnauthorized, "Missing user context"))
+		return
+	}
+
 	var pagination models.PaginationRequest
 	if err := c.ShouldBindQuery(&pagination); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("Invalid pagination parameters", models.ErrValidation, err.Error()))
 		return
 	}
 
-	schemas, paginationResp, err := h.schemaService.ListSchemas(pagination)
+	schemas, paginationResp, err := h.schemaService.ListSchemas(pagination, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to list schemas", models.ErrInternalError, err.Error()))
 		return
@@ -58,6 +73,13 @@ func (h *SchemaHandler) ListSchemas(c *gin.Context) {
 
 // GetSchema handles GET /schemas/:id
 func (h *SchemaHandler) GetSchema(c *gin.Context) {
+	// Get authenticated user ID
+	userID, exists := middleware.GetUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse("User not authenticated", models.ErrUnauthorized, "Missing user context"))
+		return
+	}
+
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
 	if err != nil {
@@ -65,7 +87,7 @@ func (h *SchemaHandler) GetSchema(c *gin.Context) {
 		return
 	}
 
-	schema, err := h.schemaService.GetSchema(id)
+	schema, err := h.schemaService.GetSchema(id, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse("Schema not found", models.ErrSchemaNotFound, err.Error()))
 		return
@@ -76,6 +98,13 @@ func (h *SchemaHandler) GetSchema(c *gin.Context) {
 
 // UpdateSchema handles PUT /schemas/:id
 func (h *SchemaHandler) UpdateSchema(c *gin.Context) {
+	// Get authenticated user ID
+	userID, exists := middleware.GetUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse("User not authenticated", models.ErrUnauthorized, "Missing user context"))
+		return
+	}
+
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
 	if err != nil {
@@ -89,7 +118,7 @@ func (h *SchemaHandler) UpdateSchema(c *gin.Context) {
 		return
 	}
 
-	schema, err := h.schemaService.UpdateSchema(id, request)
+	schema, err := h.schemaService.UpdateSchema(id, userID, request)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to update schema", models.ErrInternalError, err.Error()))
 		return
@@ -100,6 +129,13 @@ func (h *SchemaHandler) UpdateSchema(c *gin.Context) {
 
 // DeleteSchema handles DELETE /schemas/:id
 func (h *SchemaHandler) DeleteSchema(c *gin.Context) {
+	// Get authenticated user ID
+	userID, exists := middleware.GetUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse("User not authenticated", models.ErrUnauthorized, "Missing user context"))
+		return
+	}
+
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
 	if err != nil {
@@ -107,7 +143,7 @@ func (h *SchemaHandler) DeleteSchema(c *gin.Context) {
 		return
 	}
 
-	if err := h.schemaService.DeleteSchema(id); err != nil {
+	if err := h.schemaService.DeleteSchema(id, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to delete schema", models.ErrInternalError, err.Error()))
 		return
 	}
@@ -117,6 +153,13 @@ func (h *SchemaHandler) DeleteSchema(c *gin.Context) {
 
 // ExportSQL handles GET /schemas/:id/export/sql
 func (h *SchemaHandler) ExportSQL(c *gin.Context) {
+	// Get authenticated user ID
+	userID, exists := middleware.GetUserIDFromContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse("User not authenticated", models.ErrUnauthorized, "Missing user context"))
+		return
+	}
+
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
 	if err != nil {
@@ -124,7 +167,7 @@ func (h *SchemaHandler) ExportSQL(c *gin.Context) {
 		return
 	}
 
-	sqlExport, err := h.schemaService.ExportSQL(id)
+	sqlExport, err := h.schemaService.ExportSQL(id, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("Failed to export SQL", models.ErrInternalError, err.Error()))
 		return

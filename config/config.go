@@ -7,30 +7,32 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Environment  string
-	Port         string
-	DatabaseURL  string
-	DatabaseHost string
-	DatabasePort string
-	DatabaseUser string
-	DatabasePass string
-	DatabaseName string
-	LogLevel     string
-	AllowOrigins []string
+	Environment     string
+	Port            string
+	DatabaseURL     string
+	DatabaseHost    string
+	DatabasePort    string
+	DatabaseUser    string
+	DatabasePass    string
+	DatabaseName    string
+	LogLevel        string
+	AllowOrigins    []string
+	ClerkSecretKey  string
 }
 
 // Load loads configuration from environment variables
 func Load() *Config {
 	return &Config{
-		Environment:  getEnv("ENVIRONMENT", "development"),
-		Port:         getEnv("PORT", "8080"),
-		DatabaseURL:  getEnv("DATABASE_URL", ""),
-		DatabaseHost: getEnv("DB_HOST", "localhost"),
-		DatabasePort: getEnv("DB_PORT", "5432"),
-		DatabaseUser: getEnv("DB_USER", "postgres"),
-		DatabasePass: getEnv("DB_PASSWORD", "postgres"),
-		DatabaseName: getEnv("DB_NAME", "vdt_dashboard"),
-		LogLevel:     getEnv("LOG_LEVEL", "info"),
+		Environment:    getEnv("ENVIRONMENT", "development"),
+		Port:           getEnv("PORT", "8080"),
+		DatabaseURL:    getEnv("DATABASE_URL", ""),
+		DatabaseHost:   getEnv("DB_HOST", "localhost"),
+		DatabasePort:   getEnv("DB_PORT", "5432"),
+		DatabaseUser:   getEnv("DB_USER", "postgres"),
+		DatabasePass:   getEnv("DB_PASSWORD", "postgres"),
+		DatabaseName:   getEnv("DB_NAME", "vdt_dashboard"),
+		LogLevel:       getEnv("LOG_LEVEL", "info"),
+		ClerkSecretKey: getEnv("CLERK_SECRET_KEY", ""),
 		AllowOrigins: []string{
 			getEnv("FRONTEND_URL", "http://localhost:3000"),
 		},
