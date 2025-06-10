@@ -18,10 +18,10 @@ func SetupRoutes(router *gin.RouterGroup, db *gorm.DB, cfg *config.Config) {
 	userRepo := repositories.NewUserRepository(db)
 
 	// Initialize services
-	schemaService := services.NewSchemaService(schemaRepo, cfg)
+	databaseManagerService := services.NewDatabaseManagerService(cfg)
+	schemaService := services.NewSchemaService(schemaRepo, databaseManagerService, cfg)
 	validatorService := services.NewValidatorService()
 	sqlGeneratorService := services.NewSQLGeneratorService()
-	databaseManagerService := services.NewDatabaseManagerService(cfg)
 
 	// Initialize handlers
 	schemaHandler := handlers.NewSchemaHandler(schemaService)

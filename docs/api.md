@@ -84,10 +84,18 @@ Get information about the currently authenticated user.
 ## Schema Management Endpoints
 
 ### 1. Create Schema
-Create a new database schema and generate the actual database.
+Create a new database schema definition and automatically generate the actual PostgreSQL database with all tables, columns, and relationships.
 
 **Endpoint:** `POST /schemas`  
 **Authentication:** Required
+
+**Process:**
+1. ✅ Create schema metadata 
+2. ✅ Generate unique database name
+3. ✅ Create PostgreSQL database
+4. ✅ Execute table creation SQL
+5. ✅ Create foreign key constraints
+6. ✅ Update status to "created"
 
 **Request Body:**
 ```json
@@ -136,7 +144,8 @@ Create a new database schema and generate the actual database.
     "status": "created",
     "createdAt": "2024-01-01T10:00:00Z",
     "updatedAt": "2024-01-01T10:00:00Z",
-    "version": "1.0"
+    "version": "1.0",
+    "tableCount": 1
   }
 }
 ```
@@ -239,10 +248,19 @@ Retrieve complete schema definition including all tables, columns, and relations
 ---
 
 ### 4. Update Schema
-Update an existing schema owned by the authenticated user. This will modify the schema definition and regenerate the database.
+Update an existing schema owned by the authenticated user. This will modify the schema definition and automatically regenerate the database with the new structure.
 
 **Endpoint:** `PUT /schemas/{id}`  
 **Authentication:** Required
+
+**Process:**
+1. ✅ Validate updated schema definition
+2. ✅ Update schema metadata  
+3. ✅ Drop existing database
+4. ✅ Recreate database with new structure
+5. ✅ Execute updated table creation SQL
+6. ✅ Recreate foreign key constraints
+7. ✅ Update status to "updated"
 
 **Request Body:** Same format as Create Schema
 
@@ -316,10 +334,15 @@ Check the status of the generated database for a schema owned by the authenticat
 ---
 
 ### 7. Regenerate Database
-Force regeneration of the database from the schema definition for a schema owned by the authenticated user.
+Manually force regeneration of the database from the schema definition for a schema owned by the authenticated user. Note: This is normally done automatically when creating or updating schemas.
 
 **Endpoint:** `POST /schemas/{id}/database/regenerate`  
 **Authentication:** Required
+
+**Use Cases:**
+- Recovery from database corruption
+- Manual refresh after external changes
+- Debugging database generation issues
 
 **Response (200):**
 ```json
@@ -446,6 +469,19 @@ Check API health status.
 | `FOREIGN_KEY_ERROR` | Foreign key constraint error |
 | `DATABASE_CREATION_FAILED` | Failed to create database |
 | `INTERNAL_ERROR` | Unexpected server error |
+
+---
+
+## Schema Status Values
+
+| Status | Description |
+|--------|-------------|
+| `creating` | Schema metadata created, database generation in progress |
+| `created` | Schema and database successfully created |
+| `updating` | Schema update in progress, database regeneration ongoing |
+| `updated` | Schema and database successfully updated |
+| `regenerated` | Database manually regenerated |
+| `error` | Database generation/regeneration failed |
 
 ---
 

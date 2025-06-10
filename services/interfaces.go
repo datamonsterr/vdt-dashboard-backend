@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -10,6 +11,9 @@ import (
 	"vdt-dashboard-backend/repositories"
 
 	"github.com/google/uuid"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // SchemaService defines the interface for schema business logic
@@ -43,10 +47,11 @@ type DatabaseManagerService interface {
 }
 
 // NewSchemaService creates a new schema service
-func NewSchemaService(repo repositories.SchemaRepository, cfg *config.Config) SchemaService {
+func NewSchemaService(repo repositories.SchemaRepository, databaseManager DatabaseManagerService, cfg *config.Config) SchemaService {
 	return &schemaService{
-		repo:   repo,
-		config: cfg,
+		repo:            repo,
+		databaseManager: databaseManager,
+		config:          cfg,
 	}
 }
 
@@ -69,8 +74,9 @@ func NewDatabaseManagerService(cfg *config.Config) DatabaseManagerService {
 
 // Service implementations
 type schemaService struct {
-	repo   repositories.SchemaRepository
-	config *config.Config
+	repo            repositories.SchemaRepository
+	databaseManager DatabaseManagerService
+	config          *config.Config
 }
 
 type validatorService struct{}
@@ -96,7 +102,7 @@ func (s *schemaService) CreateSchema(request models.CreateSchemaRequest, userID 
 		Name:         request.Name,
 		Description:  request.Description,
 		DatabaseName: databaseName,
-		Status:       "created",
+		Status:       "creating",
 		Version:      "1.0",
 		UserID:       userID,
 		SchemaDefinition: models.SchemaData{
@@ -107,8 +113,23 @@ func (s *schemaService) CreateSchema(request models.CreateSchemaRequest, userID 
 		},
 	}
 
+	// Create schema metadata first
 	if err := s.repo.Create(schema); err != nil {
 		return nil, fmt.Errorf("failed to create schema: %w", err)
+	}
+
+	// Generate the actual database
+	if err := s.databaseManager.RegenerateDatabase(schema.SchemaDefinition, schema.DatabaseName); err != nil {
+		// Update status to error
+		schema.Status = "error"
+		s.repo.Update(schema)
+		return nil, fmt.Errorf("failed to generate database: %w", err)
+	}
+
+	// Update status to created
+	schema.Status = "created"
+	if err := s.repo.Update(schema); err != nil {
+		log.Printf("Warning: failed to update schema status: %v", err)
 	}
 
 	return schema, nil
@@ -131,8 +152,10 @@ func (s *schemaService) UpdateSchema(id, userID uuid.UUID, request models.Update
 		}
 	}
 
+	// Update schema definition
 	schema.Name = request.Name
 	schema.Description = request.Description
+	schema.Status = "updating"
 	schema.SchemaDefinition = models.SchemaData{
 		Tables:      request.Tables,
 		ForeignKeys: request.ForeignKeys,
@@ -140,8 +163,23 @@ func (s *schemaService) UpdateSchema(id, userID uuid.UUID, request models.Update
 		ExportedAt:  time.Now().Format(time.RFC3339),
 	}
 
+	// Save schema metadata first
 	if err := s.repo.Update(schema); err != nil {
 		return nil, fmt.Errorf("failed to update schema: %w", err)
+	}
+
+	// Regenerate the database with new definition
+	if err := s.databaseManager.RegenerateDatabase(schema.SchemaDefinition, schema.DatabaseName); err != nil {
+		// Update status to error
+		schema.Status = "error"
+		s.repo.Update(schema)
+		return nil, fmt.Errorf("failed to regenerate database: %w", err)
+	}
+
+	// Update status to updated
+	schema.Status = "updated"
+	if err := s.repo.Update(schema); err != nil {
+		log.Printf("Warning: failed to update schema status: %v", err)
 	}
 
 	return schema, nil
@@ -239,9 +277,38 @@ func (g *sqlGeneratorService) GenerateCreateTables(schemaData models.SchemaData)
 	var statements []string
 
 	for _, table := range schemaData.Tables {
-		statement := fmt.Sprintf("CREATE TABLE %s (", table.Name)
-		// TODO: Implement full column definition generation
-		statement += "\n  -- TODO: Generate column definitions"
+		var columns []string
+		var primaryKeys []string
+		var uniqueConstraints []string
+
+		// Generate column definitions
+		for _, column := range table.Columns {
+			columnDef := g.generateColumnDefinition(column)
+			columns = append(columns, columnDef)
+
+			if column.PrimaryKey {
+				primaryKeys = append(primaryKeys, column.Name)
+			}
+
+			if column.Unique && !column.PrimaryKey {
+				uniqueConstraints = append(uniqueConstraints, fmt.Sprintf("UNIQUE (%s)", column.Name))
+			}
+		}
+
+		// Build CREATE TABLE statement
+		statement := fmt.Sprintf("CREATE TABLE %s (\n", table.Name)
+		statement += "    " + strings.Join(columns, ",\n    ")
+
+		// Add primary key constraint
+		if len(primaryKeys) > 0 {
+			statement += fmt.Sprintf(",\n    PRIMARY KEY (%s)", strings.Join(primaryKeys, ", "))
+		}
+
+		// Add unique constraints
+		for _, constraint := range uniqueConstraints {
+			statement += fmt.Sprintf(",\n    %s", constraint)
+		}
+
 		statement += "\n);"
 		statements = append(statements, statement)
 	}
@@ -252,12 +319,147 @@ func (g *sqlGeneratorService) GenerateCreateTables(schemaData models.SchemaData)
 func (g *sqlGeneratorService) GenerateForeignKeys(schemaData models.SchemaData) ([]string, error) {
 	var statements []string
 
+	// First, create a map of table IDs to table names for lookup
+	tableMap := make(map[string]string)
+	columnMap := make(map[string]string)
+
+	for _, table := range schemaData.Tables {
+		tableMap[table.ID] = table.Name
+		for _, column := range table.Columns {
+			columnMap[column.ID] = column.Name
+		}
+	}
+
 	for _, fk := range schemaData.ForeignKeys {
-		statement := fmt.Sprintf("-- TODO: Generate foreign key for %s", fk.ID)
+		sourceTable, sourceTableExists := tableMap[fk.SourceTableId]
+		targetTable, targetTableExists := tableMap[fk.TargetTableId]
+		sourceColumn, sourceColumnExists := columnMap[fk.SourceColumnId]
+		targetColumn, targetColumnExists := columnMap[fk.TargetColumnId]
+
+		if !sourceTableExists || !targetTableExists || !sourceColumnExists || !targetColumnExists {
+			continue // Skip invalid foreign keys
+		}
+
+		constraintName := fk.Name
+		if constraintName == "" {
+			constraintName = fmt.Sprintf("fk_%s_%s", sourceTable, sourceColumn)
+		}
+
+		onDelete := "RESTRICT"
+		if fk.OnDelete != "" && models.ValidForeignKeyActions[fk.OnDelete] {
+			onDelete = fk.OnDelete
+		}
+
+		onUpdate := "RESTRICT"
+		if fk.OnUpdate != "" && models.ValidForeignKeyActions[fk.OnUpdate] {
+			onUpdate = fk.OnUpdate
+		}
+
+		statement := fmt.Sprintf(
+			"ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s (%s) ON DELETE %s ON UPDATE %s;",
+			sourceTable,
+			constraintName,
+			sourceColumn,
+			targetTable,
+			targetColumn,
+			onDelete,
+			onUpdate,
+		)
 		statements = append(statements, statement)
 	}
 
 	return statements, nil
+}
+
+// generateColumnDefinition creates SQL column definition from column model
+func (g *sqlGeneratorService) generateColumnDefinition(column models.Column) string {
+	var def strings.Builder
+
+	def.WriteString(column.Name)
+	def.WriteString(" ")
+
+	// Data type mapping
+	switch column.DataType {
+	case "INT":
+		if column.AutoIncrement {
+			def.WriteString("SERIAL")
+		} else {
+			def.WriteString("INTEGER")
+		}
+	case "BIGINT":
+		if column.AutoIncrement {
+			def.WriteString("BIGSERIAL")
+		} else {
+			def.WriteString("BIGINT")
+		}
+	case "VARCHAR":
+		length := 255
+		if column.Length != nil && *column.Length > 0 {
+			length = *column.Length
+		}
+		def.WriteString(fmt.Sprintf("VARCHAR(%d)", length))
+	case "TEXT":
+		def.WriteString("TEXT")
+	case "BOOLEAN":
+		def.WriteString("BOOLEAN")
+	case "TIMESTAMP":
+		def.WriteString("TIMESTAMP WITH TIME ZONE")
+	case "DATE":
+		def.WriteString("DATE")
+	case "TIME":
+		def.WriteString("TIME")
+	case "DECIMAL":
+		precision := 10
+		scale := 2
+		if column.Precision != nil {
+			precision = *column.Precision
+		}
+		if column.Scale != nil {
+			scale = *column.Scale
+		}
+		def.WriteString(fmt.Sprintf("DECIMAL(%d,%d)", precision, scale))
+	case "FLOAT":
+		def.WriteString("REAL")
+	case "DOUBLE":
+		def.WriteString("DOUBLE PRECISION")
+	case "JSON":
+		def.WriteString("JSONB")
+	case "UUID":
+		def.WriteString("UUID")
+	default:
+		def.WriteString("TEXT") // Fallback
+	}
+
+	// Nullable constraint
+	if !column.Nullable {
+		def.WriteString(" NOT NULL")
+	}
+
+	// Default value
+	if column.DefaultValue != nil {
+		switch v := column.DefaultValue.(type) {
+		case string:
+			if v != "" {
+				def.WriteString(fmt.Sprintf(" DEFAULT '%s'", v))
+			}
+		case bool:
+			def.WriteString(fmt.Sprintf(" DEFAULT %t", v))
+		case float64:
+			def.WriteString(fmt.Sprintf(" DEFAULT %v", v))
+		}
+	}
+
+	// UUID default for UUID columns
+	if column.DataType == "UUID" && column.DefaultValue == nil {
+		def.WriteString(" DEFAULT gen_random_uuid()")
+	}
+
+	// Timestamp defaults
+	if column.DataType == "TIMESTAMP" && column.DefaultValue == nil {
+		def.WriteString(" DEFAULT CURRENT_TIMESTAMP")
+	}
+
+	return def.String()
 }
 
 // DatabaseManagerService implementation
@@ -270,15 +472,108 @@ func (d *databaseManagerService) DropDatabase(databaseName string) error {
 }
 
 func (d *databaseManagerService) GetDatabaseStatus(databaseName string) (*models.DatabaseStatus, error) {
+	// Connect to the user's database to check status
+	dsn := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		d.config.DatabaseHost,
+		d.config.DatabasePort,
+		d.config.DatabaseUser,
+		d.config.DatabasePass,
+		databaseName,
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		return &models.DatabaseStatus{
+			DatabaseName: databaseName,
+			Status:       "error",
+			TableCount:   0,
+			LastChecked:  time.Now(),
+		}, nil
+	}
+
+	// Count tables
+	var tableCount int64
+	err = db.Raw("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'").Scan(&tableCount).Error
+	if err != nil {
+		tableCount = 0
+	}
+
+	connectionString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
+		d.config.DatabaseUser,
+		"***", // Hide password
+		d.config.DatabaseHost,
+		d.config.DatabasePort,
+		databaseName,
+	)
+
 	return &models.DatabaseStatus{
-		DatabaseName: databaseName,
-		Status:       "healthy",
-		TableCount:   0,
-		LastChecked:  time.Now(),
+		DatabaseName:     databaseName,
+		Status:           "healthy",
+		TableCount:       int(tableCount),
+		LastChecked:      time.Now(),
+		ConnectionString: connectionString,
 	}, nil
 }
 
 func (d *databaseManagerService) RegenerateDatabase(schemaData models.SchemaData, databaseName string) error {
-	// TODO: Implement database regeneration logic
+	// Create SQL generator
+	sqlGen := &sqlGeneratorService{}
+
+	// Drop existing database
+	if err := d.DropDatabase(databaseName); err != nil {
+		// Ignore error if database doesn't exist
+		log.Printf("Warning: Failed to drop database %s: %v", databaseName, err)
+	}
+
+	// Create new database
+	if err := d.CreateDatabase(databaseName); err != nil {
+		return fmt.Errorf("failed to create database: %w", err)
+	}
+
+	// Connect to the new database
+	dsn := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		d.config.DatabaseHost,
+		d.config.DatabasePort,
+		d.config.DatabaseUser,
+		d.config.DatabasePass,
+		databaseName,
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to connect to new database: %w", err)
+	}
+
+	// Generate and execute table creation statements
+	tableStatements, err := sqlGen.GenerateCreateTables(schemaData)
+	if err != nil {
+		return fmt.Errorf("failed to generate table statements: %w", err)
+	}
+
+	for _, statement := range tableStatements {
+		if err := db.Exec(statement).Error; err != nil {
+			return fmt.Errorf("failed to execute table statement: %w\nStatement: %s", err, statement)
+		}
+	}
+
+	// Generate and execute foreign key statements
+	fkStatements, err := sqlGen.GenerateForeignKeys(schemaData)
+	if err != nil {
+		return fmt.Errorf("failed to generate foreign key statements: %w", err)
+	}
+
+	for _, statement := range fkStatements {
+		if err := db.Exec(statement).Error; err != nil {
+			return fmt.Errorf("failed to execute foreign key statement: %w\nStatement: %s", err, statement)
+		}
+	}
+
+	log.Printf("Successfully regenerated database %s with %d tables", databaseName, len(schemaData.Tables))
 	return nil
 }

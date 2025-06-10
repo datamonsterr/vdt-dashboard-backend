@@ -7,17 +7,17 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Environment     string
-	Port            string
-	DatabaseURL     string
-	DatabaseHost    string
-	DatabasePort    string
-	DatabaseUser    string
-	DatabasePass    string
-	DatabaseName    string
-	LogLevel        string
-	AllowOrigins    []string
-	ClerkSecretKey  string
+	Environment    string
+	Port           string
+	DatabaseURL    string
+	DatabaseHost   string
+	DatabasePort   string
+	DatabaseUser   string
+	DatabasePass   string
+	DatabaseName   string
+	LogLevel       string
+	AllowOrigins   []string
+	ClerkSecretKey string
 }
 
 // Load loads configuration from environment variables
@@ -35,6 +35,7 @@ func Load() *Config {
 		ClerkSecretKey: getEnv("CLERK_SECRET_KEY", ""),
 		AllowOrigins: []string{
 			getEnv("FRONTEND_URL", "http://localhost:3000"),
+			getEnv("STORYBOOK_URL", "http://localhost:6006"),
 		},
 	}
 }

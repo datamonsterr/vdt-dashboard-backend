@@ -87,24 +87,21 @@ func runMigrations(db *gorm.DB) error {
 	// Execute each migration file
 	for _, file := range files {
 		log.Printf("📄 Executing migration: %s", filepath.Base(file))
-		
+
 		content, err := ioutil.ReadFile(file)
 		if err != nil {
 			return fmt.Errorf("failed to read migration file %s: %w", file, err)
 		}
 
-		// Split file content by statements (separated by semicolons followed by newlines)
-		statements := strings.Split(string(content), ";\n")
-		
-		for i, statement := range statements {
-			statement = strings.TrimSpace(statement)
-			if statement == "" || strings.HasPrefix(statement, "--") {
-				continue
-			}
+		// Execute the entire file content as one statement to handle functions properly
+		// PostgreSQL functions with $$ delimiters can contain semicolons
+		contentStr := strings.TrimSpace(string(content))
+		if contentStr == "" {
+			continue
+		}
 
-			if err := db.Exec(statement).Error; err != nil {
-				return fmt.Errorf("failed to execute statement %d in file %s: %w\nStatement: %s", i+1, file, err, statement)
-			}
+		if err := db.Exec(contentStr).Error; err != nil {
+			return fmt.Errorf("failed to execute migration file %s: %w", file, err)
 		}
 	}
 
@@ -167,7 +164,7 @@ func seedData(db *gorm.DB) error {
 
 	for _, file := range files {
 		log.Printf("📄 Executing seed file: %s", filepath.Base(file))
-		
+
 		content, err := ioutil.ReadFile(file)
 		if err != nil {
 			return fmt.Errorf("failed to read seed file %s: %w", file, err)
@@ -209,4 +206,4 @@ func resetDatabase(db *gorm.DB) error {
 	}
 
 	return nil
-} 
+}
